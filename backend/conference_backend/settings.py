@@ -4,6 +4,31 @@ Django settings for conference_backend project.
 from pathlib import Path
 from decouple import config, Csv
 import os
+import ssl
+import certifi
+
+# FIX: Ensure SSL certificates are found (common issue on Windows/macOS)
+os.environ['SSL_CERT_FILE'] = certifi.where()
+
+# DEVELOPMENT ONLY: Bypass SSL verification for local dev environments
+try:
+    if config('DEBUG', default=True, cast=bool):
+        # Fix for generic HTTPS calls (requests, etc)
+        ssl._create_default_https_context = ssl._create_unverified_context
+        
+        # FIX for SMTP (Basic Constraints of CA cert error)
+        # We must patch the context creator used by smtplib
+        _orig_ctx = ssl.create_default_context
+        def _unv_ctx(*args, **kwargs):
+            ctx = _orig_ctx(*args, **kwargs)
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            return ctx
+        ssl.create_default_context = _unv_ctx
+except:
+    pass
+
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -59,8 +84,12 @@ WSGI_APPLICATION = 'conference_backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': config('DB_NAME'),
+        'USER': config('DB_USER'),
+        'PASSWORD': config('DB_PASSWORD'),
+        'HOST': config('DB_HOST', default='localhost'),
+        'PORT': config('DB_PORT', default='5432'),
     }
 }
 
@@ -111,9 +140,9 @@ CORS_ALLOW_CREDENTIALS = True
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
-EMAIL_PORT = config('EMAIL_PORT', default=465, cast=int)  # Switched to 465
-EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=False, cast=bool) # 465 uses SSL, not TLS
-EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool) 
+EMAIL_PORT = config('EMAIL_PORT', default=587, cast=int)  # 587 is standard for TLS
+EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=True, cast=bool) 
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=False, cast=bool) 
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default=f"MoA Conference Center <{EMAIL_HOST_USER}>")

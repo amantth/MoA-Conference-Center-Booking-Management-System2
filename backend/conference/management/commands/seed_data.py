@@ -74,10 +74,12 @@ class Command(BaseCommand):
         # 5. SEED EMAIL TEMPLATES
         self.stdout.write('Seeding professional email templates...')
         templates = [
-            {'trigger': 'approved', 'subject': 'Reservation Approved', 'body': 'Dear {name}, your booking for {venue} on {date} is approved.'},
-            {'trigger': 'confirmed', 'subject': 'Reservation Confirmed', 'body': 'Dear {name}, your booking for {venue} is confirmed.'},
-            {'trigger': 'rejected', 'subject': 'Reservation Update', 'body': 'Dear {name}, your booking was rejected.'},
+            {'trigger': 'received', 'subject': 'Acknowledge: {event} Request Received', 'body': 'Dear {name},\n\nWe have received your booking request for {event} at {venue} on {date}. Your reference ID is {ref}.\n\nOur team is currently reviewing your request. You will be notified via email of any status updates.'},
+            {'trigger': 'approved', 'subject': 'Reservation Approved: {event}', 'body': 'Dear {name},\n\nYour booking request for {event} at {venue} on {date} has been approved. Please proceed with the necessary arrangements.\n\nThank you.'},
+            {'trigger': 'confirmed', 'subject': 'Reservation Confirmed: {event}', 'body': 'Dear {name},\n\nYour booking for {event} is now officially confirmed. We look forward to hosting you.'},
+            {'trigger': 'rejected', 'subject': 'Update: Booking Request Rejected', 'body': 'Dear {name},\n\nWe regret to inform you that your booking for {event} has been rejected. Please contact the administrator for further details.'},
         ]
+
 
         for t in templates:
             EmailTemplate.objects.update_or_create(
