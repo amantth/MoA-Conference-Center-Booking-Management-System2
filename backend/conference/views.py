@@ -254,9 +254,9 @@ class BookingViewSet(viewsets.ModelViewSet):
             if role == 'organizer':
                 qs = qs.filter(Q(user=user) | scheduled_q).distinct()
             elif role == 'ict_admin':
-                qs = qs.filter(Q(technical_services__isnull=False) | scheduled_q).distinct()
+                qs = qs.filter(technical_services__isnull=False).distinct()
             elif role == 'catering_support':
-                qs = qs.filter(Q(support_services__isnull=False) | scheduled_q).distinct()
+                qs = qs.filter(support_services__isnull=False).distinct()
         else:
             return qs.none()
 
@@ -389,7 +389,6 @@ class BookingViewSet(viewsets.ModelViewSet):
             if booking.status in ('cancelled', 'completed', 'rejected'):
                 return Response({'error': 'Cannot edit this booking status.'}, status=400)
             
-            # Removed the broken Gregorian math. Frontend handles the lock.
             booking.event_title = request.data.get('event_title', booking.event_title)
             booking.event_description = request.data.get('event_description', booking.event_description)
             booking.organizer_phone = request.data.get('organizer_phone', booking.organizer_phone)
@@ -402,6 +401,42 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response(BookingSerializer(booking, context={'request': request}).data)
         except (Booking.DoesNotExist, ValueError):
             return Response({'error': 'Booking not found.'}, status=404)
+
+    @action(detail=True, methods=['patch'], url_path='acknowledge_ict', permission_classes=[IsICTOrAdmin])
+    def acknowledge_ict(self, request, pk=None):
+        booking = self.get_object()
+        booking.ict_acknowledged = request.data.get('ict_acknowledged', True)
+        if booking.ict_acknowledged:
+            booking.ict_rejected = False
+            booking.ict_rejection_reason = ""
+        booking.save()
+        return Response(BookingSerializer(booking, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch'], url_path='set_unavailable_services', permission_classes=[IsICTOrAdmin])
+    def set_unavailable_services(self, request, pk=None):
+        booking = self.get_object()
+        services_ids = request.data.get('unavailable_technical_services', [])
+        services = TechnicalService.objects.filter(id__in=services_ids)
+        booking.unavailable_technical_services.set(services)
+        return Response(BookingSerializer(booking, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch'], url_path='set_unavailable_support_services', permission_classes=[IsCateringOrAdmin])
+    def set_unavailable_support_services(self, request, pk=None):
+        booking = self.get_object()
+        services_ids = request.data.get('unavailable_support_services', [])
+        services = SupportService.objects.filter(id__in=services_ids)
+        booking.unavailable_support_services.set(services)
+        return Response(BookingSerializer(booking, context={'request': request}).data)
+
+    @action(detail=True, methods=['patch'], url_path='acknowledge_catering', permission_classes=[IsCateringOrAdmin])
+    def acknowledge_catering(self, request, pk=None):
+        booking = self.get_object()
+        booking.catering_acknowledged = request.data.get('catering_acknowledged', True)
+        if booking.catering_acknowledged:
+            booking.catering_rejected = False
+            booking.catering_rejection_reason = ""
+        booking.save()
+        return Response(BookingSerializer(booking, context={'request': request}).data)
 
 class SystemUserViewSet(viewsets.ModelViewSet):
     queryset           = SystemUser.objects.select_related('user').all()
